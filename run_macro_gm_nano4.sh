@@ -193,9 +193,21 @@ echo " variant : ${VARIANT}"
 echo " seed    : ${SEED}"
 echo "=================================================="
 
-echo
-echo "===== TRAIN ====="
-$PY train_${VARIANT}.py -d "$GROUP"
+mkdir -p results
+CPT_KEEP="results/${GROUP}_${VARIANT}_seed${SEED}.pth"
+
+# GM_SKIP_TRAIN=1 時，已經存過帶 seed 的 checkpoint 就直接取樣。
+# 用在取樣階段失敗、訓練不必重來的情況。
+if [ -n "${GM_SKIP_TRAIN:-}" ] && [ -f "$CPT_KEEP" ]; then
+    echo
+    echo "===== TRAIN 略過（GM_SKIP_TRAIN，沿用 ${CPT_KEEP}）====="
+    SKIP_TRAIN=1
+else
+    echo
+    echo "===== TRAIN ====="
+    $PY train_${VARIANT}.py -d "$GROUP"
+    SKIP_TRAIN=0
+fi
 
 # 同一個組合的兩個 variant 會寫進同一個目錄，只依時間取最新會抓錯。
 # train_sync.py 存成 Sync_*.pth、train_async.py 存成 Async_*.pth。
@@ -204,15 +216,16 @@ case "$VARIANT" in
     async) _pat="Async_*.pth" ;;
     *)     _pat="*.pth" ;;
 esac
-CPT=$(ls -t ${GROUP}_cpts/${_pat} 2>/dev/null | head -1)
-[ -n "$CPT" ] || { echo "[ERROR] 找不到 checkpoint"; exit 1; }
+if [ "$SKIP_TRAIN" = "1" ]; then
+    CPT="$CPT_KEEP"
+else
+    CPT=$(ls -t ${GROUP}_cpts/${_pat} 2>/dev/null | head -1)
+    [ -n "$CPT" ] || { echo "[ERROR] 找不到 checkpoint"; exit 1; }
+    # checkpoint 的檔名裡沒有 seed，同組合不同 seed 會互相覆蓋。
+    # 另存成帶 seed 的名字，掃描與後續分析才對得起來。
+    cp "$CPT" "$CPT_KEEP"
+fi
 echo "checkpoint: $CPT"
-
-# checkpoint 的檔名裡沒有 seed，同組合不同 seed 會互相覆蓋。跑完把它另存
-# 成帶 seed 的名字，掃描與後續分析才對得起來。
-mkdir -p results
-CPT_KEEP="results/${GROUP}_${VARIANT}_seed${SEED}.pth"
-cp "$CPT" "$CPT_KEEP"
 
 echo
 echo "===== SAMPLE ====="

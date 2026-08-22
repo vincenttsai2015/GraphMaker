@@ -100,7 +100,7 @@ echo "sbatch --account=${ACCOUNT} --array=${CHUNK} ${RUNNER}"
 
 if [ "$SUBMIT" = "1" ]; then
     echo
-    sbatch --account="${ACCOUNT}" --array="${CHUNK}" "${RUNNER}"
+    sbatch --account="${ACCOUNT}" --export=ALL,GM_SKIP_TRAIN="${GM_SKIP_TRAIN:-}" --array="${CHUNK}" "${RUNNER}"
     if [ "$N_MISS" -gt "$SLOTS" ]; then
         echo
         echo "還有 $((N_MISS - SLOTS)) 個沒送，等 queue 空出來再執行一次"
