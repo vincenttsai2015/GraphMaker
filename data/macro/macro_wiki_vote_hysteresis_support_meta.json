@@ -1,0 +1,17 @@
+{
+ "dataset": "wiki_vote",
+ "mode": "hysteresis",
+ "layer_name": "support",
+ "num_nodes": 5932,
+ "num_edges": 217498,
+ "num_attrs": 6,
+ "num_labels": 4,
+ "thresholds": [
+  0.3333333333333333,
+  0.5208333333333334,
+  0.6136363636363636,
+  0.6796875,
+  0.7576746323529411,
+  0.9375
+ ]
+}

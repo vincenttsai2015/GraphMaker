@@ -1,0 +1,17 @@
+{
+ "dataset": "wiki_vote",
+ "mode": "burst",
+ "layer_name": "support",
+ "num_nodes": 5932,
+ "num_edges": 272270,
+ "num_attrs": 6,
+ "num_labels": 4,
+ "thresholds": [
+  0.296875,
+  0.4998372395833333,
+  0.5772653922542205,
+  0.640625,
+  0.7142857142857143,
+  0.8984375
+ ]
+}

@@ -1,0 +1,17 @@
+{
+ "dataset": "twitter",
+ "mode": "burst",
+ "layer_name": "RT",
+ "num_nodes": 6000,
+ "num_edges": 95888,
+ "num_attrs": 6,
+ "num_labels": 4,
+ "thresholds": [
+  0.46875,
+  0.5390625,
+  0.5902777777777778,
+  0.6315893717568569,
+  0.6758147321428571,
+  0.7375
+ ]
+}

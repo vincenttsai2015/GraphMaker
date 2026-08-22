@@ -234,7 +234,10 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("-d", "--dataset", type=str, required=True,
-                        choices=["cora", "amazon_photo", "amazon_computer"])
+                        # macro_<資料集>_<mode>_<層> 由 load_dataset 的 macro_
+                        # 分支處理，數量會隨資料變動，不列在 choices 裡。
+                        # 名稱打錯時 load_dataset 會報找不到檔案。
+                        )
     args = parser.parse_args()
 
     main(args)

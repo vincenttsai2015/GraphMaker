@@ -1,0 +1,45 @@
+meta_data :
+  variant: "Sync" # Model name.
+
+gnn_X : # GNN for reconstructing node attributes.
+  hidden_t: 32 # Hidden size for the normalized time step.
+  hidden_X: 512 # Hidden size for the node attributes.
+  hidden_Y: 64 # Hidden size for the node labels.
+  num_gnn_layers: 2 # Number of GNN layers.
+  dropout: 0 # Dropout rate.
+
+gnn_E : # GNN for reconstructing edges.
+  hidden_t: 32 # Hidden size for the normalized time step.
+  hidden_X: 512 # Hidden size for the node attributes.
+  hidden_Y: 64 # Hidden size for the node labels.
+  hidden_E: 128 # Hidden size for the edges.
+  num_gnn_layers: 2 # Number of GNN layers.
+  dropout: 0 # Dropout rate.
+
+diffusion :
+  T : 3 # Number of diffusion steps - 1, slightly inconsistent with the paper.
+
+optimizer_X :
+  lr : 0.001 # Learning rate.
+  weight_decay : 0 # Weight decay.
+  amsgrad : true
+
+optimizer_E :
+  lr : 0.0003 # Learning rate.
+  weight_decay : 0 # Weight decay.
+  amsgrad : true
+
+lr_scheduler :
+  factor : 0.9 # Factor by which the learning rate will be reduced.
+  patience : 5 # Number of epochs with no improvement after which learning rate will be reduced.
+  verbose : true
+
+train :
+  num_epochs : 100 # 實測 98 秒/epoch，100 個約 2.7 小時。早停的 patient_epochs 在
+          # 這個資料上不會觸發：val nll 的改善在小數點第四位，
+          # 任何微小進步都會重置 patience，不設上限會跑滿而撞 walltime。
+  val_every_epochs : 1 # Frequency of performing validation.
+  patient_epochs : 20 # Patience for early stop.
+  max_grad_norm : 10 # Maximal grad norm.
+  batch_size : 16384
+  val_batch_size : 131072

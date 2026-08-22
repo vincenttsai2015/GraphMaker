@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("--model_path", type=str, help="Path to the model.")
-    parser.add_argument("--dataset", type=str, choices=["cora", "amazon_photo", "amazon_computer"],
+    parser.add_argument("--dataset", type=str,
                         help="Dataset name. Only specify it if you want to use a pre-trained model.")
     parser.add_argument("--type", type=str, choices=["sync", "async"],
                         help="Model type. Only specify it if you want to use a pre-trained model.")

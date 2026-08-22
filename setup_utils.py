@@ -1,3 +1,6 @@
+import os
+import random
+
 import dgl
 import numpy as np
 import pydantic
@@ -87,7 +90,14 @@ def load_train_yaml(data_name, model_name):
     elif model_name == "Async":
         return AsyncYaml(**yaml_data).model_dump()
 
-def set_seed(seed=0):
+def set_seed(seed=None):
+    """seed 沒給時讀環境變數 GM_SEED，都沒有才用 0。
+
+    上游的呼叫端都是不帶參數的 set_seed()，改環境變數才能在不動那些檔案的
+    情況下跑多個 seed。
+    """
+    if seed is None:
+        seed = int(os.environ.get("GM_SEED", 0))
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)

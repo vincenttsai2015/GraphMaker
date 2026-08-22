@@ -1,3 +1,5 @@
+import os
+
 import dgl
 import torch
 import torch.nn.functional as F
@@ -5,7 +7,34 @@ import torch.nn.functional as F
 from dgl.data import AmazonCoBuyPhotoDataset, AmazonCoBuyComputerDataset, \
     CoraGraphDataset
 
+def load_macro_dataset(data_name):
+    """讀 npz_to_graphmaker.py 轉出的靜態屬性圖。
+
+    `data_name` 是 macro_<資料集>_<mode>_<層> 的形式，對應
+    data/macro/<data_name>.pkl。
+    """
+    import pickle
+
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        "data", "macro", f"{data_name}.pkl")
+    with open(path, "rb") as f:
+        d = pickle.load(f)
+
+    src = torch.from_numpy(d["src"]).long()
+    dst = torch.from_numpy(d["dst"]).long()
+    g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])),
+                  num_nodes=int(d["num_nodes"]))
+    g = dgl.remove_self_loop(g)
+    # X 存成 (F, N)，GraphMaker 的 preprocess 讀的是 (N, F)
+    g.ndata["feat"] = torch.from_numpy(d["X"]).T.float()
+    g.ndata["label"] = torch.from_numpy(d["Y"]).long()
+    return g
+
+
 def load_dataset(data_name):
+    if data_name.startswith("macro_"):
+        return load_macro_dataset(data_name)
+
     if data_name == "cora":
         dataset = CoraGraphDataset()
     elif data_name == "amazon_photo":
