@@ -500,6 +500,11 @@ class Evaluator:
             return self.add_mask_cora(dgl_g, Y_one_hot)
         elif self.data_name in ["amazon_photo", "amazon_computer"]:
             return self.add_mask_benchmark(dgl_g, Y_one_hot)
+        elif self.data_name.startswith("macro_"):
+            # 巨觀動態資料集沿用 benchmark 的切分：每個類別 20 train、
+            # 30 val、其餘 test。標籤是活躍比例的等量分箱，4 個類別
+            # 各有上千個節點，切得出來。
+            return self.add_mask_benchmark(dgl_g, Y_one_hot)
         else:
             raise ValueError(f'Unexpected data name: {self.data_name}')
 
