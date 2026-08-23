@@ -231,5 +231,10 @@ echo
 echo "===== SAMPLE ====="
 $PY sample.py --model_path "$CPT" 2>&1 | tee "results/${GROUP}_${VARIANT}_seed${SEED}.log"
 
+# set -eo pipefail 之下，sample.py 失敗會讓腳本在上一行就中止，
+# 所以這個標記只會在取樣真的跑完時出現。log 裡的關鍵字不能當判準——
+# 失敗的 traceback 也會提到 Evaluator。
+touch "results/${GROUP}_${VARIANT}_seed${SEED}.done"
+
 echo
 echo "===== DONE  ${GROUP} / ${VARIANT} / seed ${SEED} ====="

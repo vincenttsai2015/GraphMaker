@@ -6,7 +6,7 @@
 #   SEEDS="1" bash check_gm.sh        只看 seed 1（多人分工用）
 #   LIMIT=10 bash check_gm.sh --submit
 #
-# 完成的判準是 results/<組合>_<variant>_seed<S>.log 裡有評估輸出。
+# 完成的判準是 results/<組合>_<variant>_seed<S>.done 這個標記檔。
 # checkpoint 的檔名沒有 seed，同組合不同 seed 會互相覆蓋，所以不能靠它判斷。
 
 set -eo pipefail
@@ -59,8 +59,9 @@ while read -r idx group variant seed; do
         esac
     fi
 
-    log="results/${group}_${variant}_seed${seed}.log"
-    if [ -s "$log" ] && grep -q "Evaluator\|Metric" "$log" 2>/dev/null; then
+    # 判準是取樣跑完才寫的標記檔。不能用 log 裡的關鍵字——
+    # 失敗的 traceback 也會提到 Evaluator。
+    if [ -f "results/${group}_${variant}_seed${seed}.done" ]; then
         N_OK=$((N_OK + 1))
     elif case " $RUNNING " in *" $idx "*) true ;; *) false ;; esac; then
         N_RUN=$((N_RUN + 1))
