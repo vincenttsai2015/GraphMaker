@@ -28,6 +28,20 @@ def load_macro_dataset(data_name):
     # X 存成 (F, N)，GraphMaker 的 preprocess 讀的是 (N, F)
     g.ndata["feat"] = torch.from_numpy(d["X"]).T.float()
     g.ndata["label"] = torch.from_numpy(d["Y"]).long()
+
+    # Evaluator 會訓練 MLP 與 SGC 來比較真實圖與生成圖，那需要
+    # train / val / test 三個遮罩。dgl 內建的資料集自帶，我們的沒有。
+    # 切分固定用 seed 0，與 GM_SEED 無關——各 seed 的評估要在同一個
+    # 切分上比較才有意義。
+    n = g.num_nodes()
+    perm = torch.randperm(n, generator=torch.Generator().manual_seed(0))
+    n_train, n_val = int(n * 0.6), int(n * 0.2)
+    for name, idx in (("train_mask", perm[:n_train]),
+                      ("val_mask", perm[n_train:n_train + n_val]),
+                      ("test_mask", perm[n_train + n_val:])):
+        m = torch.zeros(n, dtype=torch.bool)
+        m[idx] = True
+        g.ndata[name] = m
     return g
 
 
