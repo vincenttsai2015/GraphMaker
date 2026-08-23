@@ -75,6 +75,11 @@ class GAETrainer(BaseTrainer):
 
         num_nodes = Z.size(0)
         train_dst, train_src = train_mask.nonzero().T
+        # train_mask 來自資料端、在 CPU 上，而下面的 batch_ids 與 Z_out
+        # 都在 self.device。邊數超過 batch_size 時才會走到索引那條路徑，
+        # 上游用的資料集邊數都在一萬上下所以碰不到。
+        train_dst = train_dst.to(self.device)
+        train_src = train_src.to(self.device)
         train_size = len(train_dst)
 
         batch_size = 16384
