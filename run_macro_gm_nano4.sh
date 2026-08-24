@@ -184,6 +184,11 @@ export WANDB_MODE=disabled
 export PYTHONUNBUFFERED=1
 export GM_SEED=$SEED
 
+# 生成圖存成與其他模型同結構的序列，才能共用分析工具。
+# GraphMaker 生成的是單一靜態圖，每張會被複製 GM_SEQ_LEN 次。
+export GM_GEN_DIR="${GM_GEN_DIR:-$HOME/gm_generated}"
+export GM_RUN_TAG="${GROUP}_${VARIANT}_seed${SEED}"
+
 mkdir -p logs
 
 echo "=================================================="

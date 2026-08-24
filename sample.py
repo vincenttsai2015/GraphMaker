@@ -1,3 +1,4 @@
+import os
 import dgl
 import torch
 import torch.nn.functional as F
@@ -83,14 +84,41 @@ def main(args):
     # Set seed for better reproducibility.
     set_seed()
 
+    samples = []
     for _ in range(args.num_samples):
         X_0_one_hot, Y_0_one_hot, E_0 = model.sample()
         src, dst = E_0.nonzero().T
         g_sample = dgl.graph((src, dst), num_nodes=num_nodes).cpu()
+        samples.append(g_sample)
 
         evaluator.add_sample(g_sample,
                              X_0_one_hot.cpu(),
                              Y_0_one_hot.cpu())
+
+    # GM_GEN_DIR 給定時把生成圖存成 networkx 序列，與其他四個模型的
+    # sampled_ts.pkl 同結構。GraphMaker 生成的是單一靜態圖，沒有時間軸，
+    # 所以每張複製 GM_SEQ_LEN 次當成「完全不變的序列」——那些時序指標
+    # 因此量到的是零動態的基準線，不是模型能力。
+    _gen_dir = os.environ.get('GM_GEN_DIR', '')
+    if _gen_dir and samples:
+        import pickle
+        import networkx as nx
+        _T = int(os.environ.get('GM_SEQ_LEN', '32'))
+        _tag = os.environ.get('GM_RUN_TAG', args.model_path and
+                              os.path.basename(args.model_path)[:-4]
+                              or 'sample')
+        _seqs = []
+        for _g in samples:
+            _nx = nx.Graph()
+            _nx.add_nodes_from(range(_g.num_nodes()))
+            _u, _v = _g.edges()
+            _nx.add_edges_from(zip(_u.tolist(), _v.tolist()))
+            _seqs.append([_nx.copy() for _ in range(_T)])
+        _d = os.path.join(_gen_dir, _tag, 'GraphMaker')
+        os.makedirs(_d, exist_ok=True)
+        with open(os.path.join(_d, 'sampled_ts.pkl'), 'wb') as _f:
+            pickle.dump(_seqs, _f, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f'生成圖已存到 {_d}：{len(_seqs)} 張 x 複製 {_T} 次', flush=True)
 
     evaluator.summary()
 
