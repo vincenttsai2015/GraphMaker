@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from data import load_dataset, preprocess
+from macro_data import MacroCondDataset, is_macro
 from model import ModelSync
 from setup_utils import load_train_yaml, set_seed
 
@@ -28,19 +29,29 @@ def main(args):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    g = load_dataset(args.dataset)
-    X_one_hot_3d, Y, E_one_hot,\
-        X_marginal, Y_marginal, E_marginal, X_cond_Y_marginals = preprocess(g)
+    # 巨觀動態資料是多張同大小的圖、條件編在 Y；原始資料集是單一張圖。
+    macro = MacroCondDataset(args.dataset) if is_macro(args.dataset) else None
+    if macro is not None:
+        X_marginal = macro.X_marginal.to(device)
+        Y_marginal = macro.Y_marginal.to(device)
+        E_marginal = macro.E_marginal.to(device)
+        N = macro.num_nodes
+        print(f"訓練圖 {len(macro)} 張，節點 {N}，Y {macro.num_classes_Y} 類")
+    else:
+        g = load_dataset(args.dataset)
+        X_one_hot_3d, Y, E_one_hot,\
+            X_marginal, Y_marginal, E_marginal, X_cond_Y_marginals = preprocess(g)
 
-    X_one_hot_3d = X_one_hot_3d.to(device)
-    Y = Y.to(device)
-    E_one_hot = E_one_hot.to(device)
+        X_one_hot_3d = X_one_hot_3d.to(device)
+        Y = Y.to(device)
+        E_one_hot = E_one_hot.to(device)
 
-    X_marginal = X_marginal.to(device)
-    Y_marginal = Y_marginal.to(device)
-    E_marginal = E_marginal.to(device)
+        X_marginal = X_marginal.to(device)
+        Y_marginal = Y_marginal.to(device)
+        E_marginal = E_marginal.to(device)
 
-    N = g.num_nodes()
+        N = g.num_nodes()
+
     dst, src = torch.triu_indices(N, N, offset=1, device=device)
     # (|E|, 2), |E| for number of edges
     edge_index = torch.stack([dst, src], dim=1)
@@ -91,33 +102,45 @@ def main(args):
     for epoch in range(train_config["num_epochs"]):
         model.train()
 
-        for batch_edge_index in tqdm(data_loader):
-            batch_edge_index = batch_edge_index.to(device)
-            # (B), (B)
-            batch_dst, batch_src = batch_edge_index.T
-            loss_X, loss_E = model.log_p_t(X_one_hot_3d,
-                                           E_one_hot,
-                                           Y,
-                                           batch_src,
-                                           batch_dst,
-                                           E_one_hot[batch_dst, batch_src])
-            loss = loss_X + loss_E
+        # 一個 epoch 走過的圖。巨觀動態資料一組有數千張，每次隨機取一批，
+        # 讓 epoch 的長度與單張圖的版本相當。
+        if macro is not None:
+            n_take = min(train_config.get("graphs_per_epoch", 400), len(macro))
+            order = torch.randperm(len(macro))[:n_take].tolist()
+        else:
+            order = [None]
 
-            optimizer_X.zero_grad()
-            optimizer_E.zero_grad()
+        for gi in tqdm(order):
+            if macro is not None:
+                X_one_hot_3d, E_one_hot, Y = macro.tensors(gi, device)
 
-            loss.backward()
+            for batch_edge_index in data_loader:
+                batch_edge_index = batch_edge_index.to(device)
+                # (B), (B)
+                batch_dst, batch_src = batch_edge_index.T
+                loss_X, loss_E = model.log_p_t(X_one_hot_3d,
+                                               E_one_hot,
+                                               Y,
+                                               batch_src,
+                                               batch_dst,
+                                               E_one_hot[batch_dst, batch_src])
+                loss = loss_X + loss_E
 
-            nn.utils.clip_grad_norm_(
-                model.graph_encoder.pred_X.parameters(), train_config["max_grad_norm"])
-            nn.utils.clip_grad_norm_(
-                model.graph_encoder.pred_E.parameters(), train_config["max_grad_norm"])
+                optimizer_X.zero_grad()
+                optimizer_E.zero_grad()
 
-            optimizer_X.step()
-            optimizer_E.step()
+                loss.backward()
 
-            wandb.log({"train/loss_X": loss_X.item(),
-                       "train/loss_E": loss_E.item()})
+                nn.utils.clip_grad_norm_(
+                    model.graph_encoder.pred_X.parameters(), train_config["max_grad_norm"])
+                nn.utils.clip_grad_norm_(
+                    model.graph_encoder.pred_E.parameters(), train_config["max_grad_norm"])
+
+                optimizer_X.step()
+                optimizer_E.step()
+
+                wandb.log({"train/loss_X": loss_X.item(),
+                           "train/loss_E": loss_E.item()})
 
         if (epoch + 1) % train_config["val_every_epochs"] != 0:
             continue
@@ -130,22 +153,31 @@ def main(args):
         denoise_match_X = []
         log_p_0_E = []
         log_p_0_X = []
-        for batch_edge_index in tqdm(val_data_loader):
-            batch_dst, batch_src = batch_edge_index.T
+        # 驗證固定用前幾張，每個 epoch 的數字才比得起來。
+        val_order = (list(range(min(train_config.get("val_graphs", 64),
+                                    len(macro))))
+                     if macro is not None else [None])
 
-            batch_denoise_match_E, batch_denoise_match_X,\
-                batch_log_p_0_E, batch_log_p_0_X = model.val_step(
-                    X_one_hot_3d,
-                    E_one_hot,
-                    Y,
-                    batch_src,
-                    batch_dst,
-                    E_one_hot[batch_dst, batch_src])
+        for gi in val_order:
+            if macro is not None:
+                X_one_hot_3d, E_one_hot, Y = macro.tensors(gi, device)
 
-            denoise_match_E.append(batch_denoise_match_E)
-            denoise_match_X.append(batch_denoise_match_X)
-            log_p_0_E.append(batch_log_p_0_E)
-            log_p_0_X.append(batch_log_p_0_X)
+            for batch_edge_index in val_data_loader:
+                batch_dst, batch_src = batch_edge_index.T
+
+                batch_denoise_match_E, batch_denoise_match_X,\
+                    batch_log_p_0_E, batch_log_p_0_X = model.val_step(
+                        X_one_hot_3d,
+                        E_one_hot,
+                        Y,
+                        batch_src,
+                        batch_dst,
+                        E_one_hot[batch_dst, batch_src])
+
+                denoise_match_E.append(batch_denoise_match_E)
+                denoise_match_X.append(batch_denoise_match_X)
+                log_p_0_E.append(batch_log_p_0_E)
+                log_p_0_X.append(batch_log_p_0_X)
 
         denoise_match_E = np.mean(denoise_match_E)
         denoise_match_X = np.mean(denoise_match_X)

@@ -4,3 +4,7 @@ cora_cpts/
 orca/
 downloaded_cpts/
 upload.py
+# 條件式資料一組數十 MB，走雲端不進 repo（見執行手冊 D 段）
+data/macro/
+results/
+gm_generated/

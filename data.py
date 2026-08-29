@@ -7,48 +7,7 @@ import torch.nn.functional as F
 from dgl.data import AmazonCoBuyPhotoDataset, AmazonCoBuyComputerDataset, \
     CoraGraphDataset
 
-def load_macro_dataset(data_name):
-    """讀 npz_to_graphmaker.py 轉出的靜態屬性圖。
-
-    `data_name` 是 macro_<資料集>_<mode>_<層> 的形式，對應
-    data/macro/<data_name>.pkl。
-    """
-    import pickle
-
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                        "data", "macro", f"{data_name}.pkl")
-    with open(path, "rb") as f:
-        d = pickle.load(f)
-
-    src = torch.from_numpy(d["src"]).long()
-    dst = torch.from_numpy(d["dst"]).long()
-    g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])),
-                  num_nodes=int(d["num_nodes"]))
-    g = dgl.remove_self_loop(g)
-    # X 存成 (F, N)，GraphMaker 的 preprocess 讀的是 (N, F)
-    g.ndata["feat"] = torch.from_numpy(d["X"]).T.float()
-    g.ndata["label"] = torch.from_numpy(d["Y"]).long()
-
-    # Evaluator 會訓練 MLP 與 SGC 來比較真實圖與生成圖，那需要
-    # train / val / test 三個遮罩。dgl 內建的資料集自帶，我們的沒有。
-    # 切分固定用 seed 0，與 GM_SEED 無關——各 seed 的評估要在同一個
-    # 切分上比較才有意義。
-    n = g.num_nodes()
-    perm = torch.randperm(n, generator=torch.Generator().manual_seed(0))
-    n_train, n_val = int(n * 0.6), int(n * 0.2)
-    for name, idx in (("train_mask", perm[:n_train]),
-                      ("val_mask", perm[n_train:n_train + n_val]),
-                      ("test_mask", perm[n_train + n_val:])):
-        m = torch.zeros(n, dtype=torch.bool)
-        m[idx] = True
-        g.ndata[name] = m
-    return g
-
-
 def load_dataset(data_name):
-    if data_name.startswith("macro_"):
-        return load_macro_dataset(data_name)
-
     if data_name == "cora":
         dataset = CoraGraphDataset()
     elif data_name == "amazon_photo":

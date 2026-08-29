@@ -12,7 +12,7 @@
 set -eo pipefail
 cd "$(dirname "$0")"
 
-RUNNER=${RUNNER:-run_macro_gm_nano4.sh}
+RUNNER=run_macro_gm.sh
 LIMIT=${LIMIT:-20}
 ACCOUNT=${ACCOUNT:-acd109125}
 SUBMIT=0

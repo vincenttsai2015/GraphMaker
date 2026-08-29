@@ -42,5 +42,7 @@ train :
   val_every_epochs : 1 # Frequency of performing validation.
   patient_epochs : 20 # Patience for early stop.
   max_grad_norm : 10 # Maximal grad norm.
+  graphs_per_epoch : 400 # 每個 epoch 隨機取幾張訓練圖。
+  val_graphs : 64 # 驗證固定用前幾張。
   batch_size : 16384
   val_batch_size : 131072

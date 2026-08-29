@@ -795,7 +795,7 @@ class ModelSync(BaseModel):
             log_p_0_E, log_p_0_X
 
     @torch.no_grad()
-    def sample(self, batch_size=32768, num_workers=4):
+    def sample(self, batch_size=32768, num_workers=4, Y=None):
         """Sample a graph.
 
         Parameters
@@ -804,6 +804,8 @@ class ModelSync(BaseModel):
             Batch size for edge prediction.
         num_workers : int
             Number of subprocesses for data loading in edge prediction.
+        Y : torch.LongTensor of shape (|V|), optional
+            Node labels to condition on. Sampled from the marginal when absent.
 
         Returns
         -------
@@ -827,10 +829,13 @@ class ModelSync(BaseModel):
                                  num_workers=num_workers)
 
         # Sample G^T from prior distribution.
-        # (|V|, C)
-        Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
-        # (|V|)
-        Y_0 = Y_prior.multinomial(1).reshape(-1)
+        if Y is None:
+            # (|V|, C)
+            Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
+            # (|V|)
+            Y_0 = Y_prior.multinomial(1).reshape(-1)
+        else:
+            Y_0 = Y.to(device)
 
         # (|V|, |V|, 2)
         E_prior = self.E_marginal[None, None, :].expand(
@@ -1293,7 +1298,7 @@ class ModelAsync(BaseModel):
             log_p_0_E, log_p_0_X
 
     @torch.no_grad()
-    def sample(self, batch_size=32768, num_workers=4):
+    def sample(self, batch_size=32768, num_workers=4, Y=None):
         """Sample a graph.
 
         Parameters
@@ -1302,6 +1307,8 @@ class ModelAsync(BaseModel):
             Batch size for edge prediction.
         num_workers : int
             Number of subprocesses for data loading in edge prediction.
+        Y : torch.LongTensor of shape (|V|), optional
+            Node labels to condition on. Sampled from the marginal when absent.
 
         Returns
         -------
@@ -1315,10 +1322,13 @@ class ModelAsync(BaseModel):
         device = self.X_marginal.device
 
         # Sample Y_0
-        # (|V|, C)
-        Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
-        # (|V|)
-        Y_0 = Y_prior.multinomial(1).reshape(-1)
+        if Y is None:
+            # (|V|, C)
+            Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
+            # (|V|)
+            Y_0 = Y_prior.multinomial(1).reshape(-1)
+        else:
+            Y_0 = Y.to(device)
 
         # Sample X^T from prior distribution.
         # (F, |V|, 2)
