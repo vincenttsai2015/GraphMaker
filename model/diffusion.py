@@ -251,8 +251,17 @@ class BaseModel(nn.Module):
         # Row normalization.
         edges_t = E_t.nonzero().T
         num_nodes = E_t.size(0)
+        if edges_t.numel() == 0:
+            # 全空的圖在 burst 事件之間是常態。dgl 的 spmm 對零邊矩陣會以
+            # nblks == 0 崩在 CUDA kernel 裡，所以補上自環——那等價於訊息
+            # 傳遞只保留節點自己，是空鄰接在數學上本來就該有的行為。
+            loop = torch.arange(num_nodes, device=E_t.device)
+            edges_t = torch.stack([loop, loop])
         A_t = dglsp.spmatrix(edges_t, shape=(num_nodes, num_nodes))
-        D_t = dglsp.diag(A_t.sum(1)) ** -1
+        # 孤立節點的列和是 0，取倒數會得到 inf 並污染整個乘積。
+        deg = A_t.sum(1)
+        D_t = dglsp.diag(torch.where(deg > 0, 1.0 / deg,
+                                     torch.zeros_like(deg)))
         return D_t @ A_t
 
     def denoise_match_Z(self,
